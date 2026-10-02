@@ -27,17 +27,26 @@ def main():
         stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,
         encoding='utf-8',env=env,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     messages=queue.Queue()
+    # Drain stderr concurrently: Windows pipes can fill during Logback startup.
+    # Diagnostics must never block the JSON-RPC reader on stdout.
+    from collections import deque
+    diagnostics=deque(maxlen=200)
+    def receive_diagnostics():
+        for line in process.stderr: diagnostics.append(line.rstrip())
+    threading.Thread(target=receive_diagnostics,daemon=True).start()
     def receive():
         for line in process.stdout:
             try: messages.put(json.loads(line))
             except Exception as ex: messages.put(ex)
+        messages.put(RuntimeError('MCP cerró stdout: '+'\n'.join(diagnostics)))
     threading.Thread(target=receive,daemon=True).start()
     def send(value):
         process.stdin.write(json.dumps(value)+'\n');process.stdin.flush()
     def call(id,method,params):
         send(dict(jsonrpc='2.0',id=id,method=method,params=params))
         while True:
-            response=messages.get(timeout=20)
+            try: response=messages.get(timeout=20)
+            except queue.Empty: raise RuntimeError('MCP no respondió: '+'\n'.join(diagnostics))
             if isinstance(response,Exception):raise response
             if response.get('id')==id:
                 assert 'error' not in response,response

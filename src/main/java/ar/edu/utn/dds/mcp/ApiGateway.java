@@ -37,11 +37,15 @@ public class ApiGateway {
     else request.header("Content-Type", "application/json").method(method,
         HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body), StandardCharsets.UTF_8));
     HttpResponse<String> response;
+    long start = System.nanoTime();
     try { response = client.send(request.build(), HttpResponse.BodyHandlers.ofString()); }
     catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw ex; }
+    catch (java.io.IOException ex) {
+      logOperation(operation, trace, 0, start);
+      throw ex;
+    }
     boolean success = response.statusCode() >= 200 && response.statusCode() < 300;
-    System.err.printf("mcp.operacion tool=%s component=%s status=%d trace=%s%n",
-        operation.path("name").asText(), operation.path("component").asText(), response.statusCode(), trace);
+    logOperation(operation, trace, response.statusCode(), start);
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("status", response.statusCode()); result.put("traceId", trace);
     String content = response.body();
@@ -50,6 +54,20 @@ public class ApiGateway {
     String json = mapper.writeValueAsString(result);
     if (!success) throw new ApiFailure(json);
     return json;
+  }
+
+  private void logOperation(JsonNode operation, String trace, int status, long start) {
+    var previous = org.slf4j.MDC.getCopyOfContextMap();
+    try {
+      org.slf4j.MDC.put("traceId", trace); org.slf4j.MDC.put("component", "mcp");
+      org.slf4j.MDC.put("event", "mcp.operacion"); org.slf4j.MDC.put("status", String.valueOf(status));
+      org.slf4j.MDC.put("destination", operation.path("component").asText());
+      org.slf4j.MDC.put("instanceId", System.getenv().getOrDefault("INSTANCE_ID", "local"));
+      org.slf4j.MDC.put("durationMs", String.valueOf((System.nanoTime() - start) / 1_000_000));
+      org.slf4j.MDC.put("outcome", status >= 200 && status < 300 ? "ok" : "error");
+      org.slf4j.LoggerFactory.getLogger(ApiGateway.class).info("mcp.operacion tool={} destino={} status={}",
+          operation.path("name").asText(), operation.path("component").asText(), status);
+    } finally { org.slf4j.MDC.clear(); if (previous != null) org.slf4j.MDC.setContextMap(previous); }
   }
   private static String encode(String value) {
     if (value.equals(".") || value.equals("..") || value.contains("/") || value.contains("\\"))

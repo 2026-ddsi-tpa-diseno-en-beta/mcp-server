@@ -5,7 +5,9 @@
   <properties><maven.compiler.release>21</maven.compiler.release><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding></properties>
   <dependencies>
     <dependency><groupId>io.modelcontextprotocol.sdk</groupId><artifactId>mcp</artifactId><version>0.18.4</version></dependency>
-    <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-simple</artifactId><version>2.0.17</version></dependency>
+    <dependency><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId><version>1.5.18</version></dependency>
+    <dependency><groupId>com.logtail</groupId><artifactId>logback-logtail</artifactId><version>0.3.6</version></dependency>
+    <dependency><groupId>org.codehaus.janino</groupId><artifactId>janino</artifactId><version>3.1.12</version></dependency>
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>5.12.2</version><scope>test</scope></dependency>
   </dependencies>
   <build><finalName>donatrack-mcp</finalName><plugins>

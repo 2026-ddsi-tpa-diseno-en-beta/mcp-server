@@ -34,3 +34,5 @@ Configuración oficial del cliente: [servidores MCP locales en Claude Desktop](h
 No se exponen endpoints de limpieza administrativa. Las herramientas que modifican datos realizan llamadas reales a las URLs configuradas.
 
 Referencia: https://java.sdk.modelcontextprotocol.io/v0.18.4/server/
+
+Los eventos del gateway también pueden enviarse a Better Stack con `BETTERSTACK_SOURCE_TOKEN`, `BETTERSTACK_INGEST_URL` y `APP_NAME=donatrack-mcp` en el entorno del proceso Java (o `env` de la entrada MCP en Claude). El appender es opcional y no cambia el transporte: consola y diagnósticos de Logback usan stderr, stdout queda exclusivamente para JSON-RPC. Se registran herramienta, destino, estado y traceId, sin cuerpos ni credenciales.

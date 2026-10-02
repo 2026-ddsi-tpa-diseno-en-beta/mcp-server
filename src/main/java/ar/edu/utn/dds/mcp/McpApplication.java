@@ -10,7 +10,6 @@ import java.util.concurrent.CountDownLatch;
 public class McpApplication {
   public static void main(String[] args) throws Exception {
     // stdout is reserved exclusively for MCP JSON-RPC; diagnostics go to stderr.
-    System.setProperty("org.slf4j.simpleLogger.logFile", "System.err");
     var mapper = new ObjectMapper();
     var gateway = new ApiGateway(Map.of(
         "donaciones", url("DONACIONES_API_URL", "http://localhost:8081"),

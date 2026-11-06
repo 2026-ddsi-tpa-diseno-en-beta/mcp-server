@@ -59,7 +59,8 @@ def main():
         assert len(tools)==len(json.loads((root/'src/main/resources/tools.json').read_text(encoding='utf-8')))
         result=call(3,'tools/call',dict(name='salud_donaciones',arguments={}))
         assert not result.get('isError'),result
-        assert json.loads(result['content'][0]['text'])['resultado']['status']=='UP'
+        assert result['structuredContent']['resultado']['status']=='UP'
+        assert 'UP' in result['content'][0]['text']
         result=call(4,'tools/call',dict(name='realizar_donacion',arguments={}))
         assert result.get('isError'),result
         print(f'PASS MCP stdio: initialize, {len(tools)} herramientas, consulta HTTP y error de argumentos')

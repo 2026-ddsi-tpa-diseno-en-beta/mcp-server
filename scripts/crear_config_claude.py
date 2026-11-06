@@ -12,8 +12,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--java', default=shutil.which('java'))
     parser.add_argument('--salida', type=Path, default=root / 'target/claude-desktop.config.json')
+    parser.add_argument('--gateway', default='http://localhost:8080')
     for component, port in [('donaciones', 8081), ('donadores', 8082), ('logistica', 8083), ('incentivos', 8084)]:
-        parser.add_argument('--' + component, default=f'http://localhost:{port}')
+        parser.add_argument('--' + component, default=None)
     args = parser.parse_args()
     if not args.java or not Path(args.java).is_file():
         parser.error('Indicar --java con la ruta de java.exe (Java 21 o posterior).')
@@ -27,8 +28,8 @@ def main():
         parser.error('Compilar primero el MCP con mvn package.')
     config = {'mcpServers': {'donatrack': {
         'command': str(java), 'args': ['-jar', str(jar.resolve())],
-        'env': {name.upper() + '_API_URL': getattr(args, name)
-                for name in ('donaciones', 'donadores', 'logistica', 'incentivos')}
+        'env': {'GATEWAY_URL': args.gateway, **{name.upper() + '_API_URL': getattr(args, name)
+                for name in ('donaciones', 'donadores', 'logistica', 'incentivos') if getattr(args,name)}}
     }}}
     args.salida.parent.mkdir(parents=True, exist_ok=True)
     args.salida.write_text(json.dumps(config, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')

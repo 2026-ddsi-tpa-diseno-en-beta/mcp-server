@@ -1,38 +1,44 @@
-# DonaTrack MCP
+# DonaTrack MCP · Entrega 6
 
-Módulo Java 21 independiente con SDK MCP oficial y transporte stdio. Expone consultas y altas, modificaciones y bajas de los cuatro componentes; incluye los seis flujos de la entrega. Las reglas permanecen en los servicios REST.
+Cliente Java 21 para Claude Desktop, con transporte stdio y 84 herramientas. Opera los cuatro módulos mediante el API Gateway y consulta los reportes integrados de MongoDB. Las reglas de negocio permanecen en las APIs.
 
-Este repositorio contiene la implementación real: `McpApplication` registra herramientas y atiende el protocolo MCP; `ApiGateway` valida argumentos y conecta por HTTP con cada API; `src/main/resources/tools.json` describe las herramientas. Donaciones, Donadores y Entidades, Logística e Incentivos conservan sus reglas de negocio. El repositorio `testing` contiene las pruebas de integración entre estos componentes.
-
-Claude Desktop inicia este servidor como un proceso Java local mediante stdio. Las APIs pueden estar desplegadas en Render. No se necesita un servidor MCP adicional dentro de cada API.
-
-El catálogo se mantiene con `python scripts/generar_catalogo.py`. Si `testing` y `telegramBot` están junto a este repo dentro de TPA, también actualiza sus copias del contrato compartido.
+## Inicio
 
 ```sh
 mvn package
-java -jar target/donatrack-mcp.jar
+python scripts/probar_stdio.py
+python scripts/crear_config_claude.py --gateway http://localhost:8080
 ```
 
-Configurar en Claude Desktop `mcpServers.donatrack` con `command` igual a la ruta de Java 21, `args` igual a `["-jar", "RUTA_ABSOLUTA/target/donatrack-mcp.jar"]` y `env` con `DONACIONES_API_URL`, `DONADORES_API_URL`, `LOGISTICA_API_URL`, `INCENTIVOS_API_URL`. Por defecto usa localhost:8081–8084. Reiniciar Claude tras editar su configuración. El stdout se reserva para JSON-RPC; diagnósticos van a stderr.
+El generador comprueba Java 21 y el JAR y escribe `target/claude-desktop.config.json`. Incorporar la entrada a la configuración de Claude Desktop y reiniciar el cliente. `stdout` se reserva para JSON-RPC; los diagnósticos van a `stderr`.
 
-`python scripts/probar_stdio.py` prueba inicialización, listado, una consulta HTTP y errores de argumentos con un servidor local. No requiere Claude ni credenciales.
+Configurar `GATEWAY_URL` con el gateway local o desplegado. Las variables antiguas `DONACIONES_API_URL`, `DONADORES_API_URL`, `LOGISTICA_API_URL`, `INCENTIVOS_API_URL` y `CONSULTAS_API_URL` quedan como overrides para pruebas; retirarlas de la configuración de demo para garantizar que todo pase por el gateway.
 
-Para generar la configuración de Claude con rutas absolutas verificadas:
+## Herramientas
 
-```sh
-python scripts/crear_config_claude.py --java "RUTA_ABSOLUTA_A_JAVA_21"
-```
+- ABM: productos, categorías/subcategorías, identificadores, donadores, entidades, necesidades, depósitos, insignias y misiones.
+- Operaciones: donación, entrega individual/en lote, queja, procesamiento de donador, reserva de stock, misión/insignia y algoritmo del depósito.
+- Consultas integradas: `ficha_integral_donador`, `necesidades_urgentes`, `reporte_depositos`, `calidad_donaciones`.
+- Diagnóstico: estado del modelo de lectura, salud de gateway/Consultas/cuatro APIs y nombres de métricas.
+- Trazabilidad: historial de donación, quejas, stock, asignaciones y donaciones de un donador desde una fecha.
 
-El archivo queda en `target/claude-desktop.config.json`. En Windows, agregar su entrada `donatrack` a `mcpServers` en `%APPDATA%/Claude/claude_desktop_config.json`, conservando las demás entradas existentes. También se pueden indicar las URLs con `--donaciones`, `--donadores`, `--logistica` y `--incentivos`. Las cuatro APIs deben estar disponibles en esas URLs. Reiniciar Claude Desktop, comprobar que aparecen las herramientas de DonaTrack y pedirle que consulte la salud de los cuatro componentes y liste productos. Si falla, revisar `%APPDATA%/Claude/logs`.
+Las herramientas indican si leen o modifican datos y si son destructivas. Los parámetros se validan contra el esquema antes de llamar al servicio. Los filtros se codifican como query params; los IDs no pueden modificar la ruta. No se exponen borrados masivos, callbacks internos ni las claves de reconstrucción.
 
-Desde TPA, `python testing/local/probar_integracion_mcp.py` ejecuta los seis flujos por `tools/call` contra las cuatro APIs reales con bases H2 aisladas. Primero compilar los cuatro componentes y este módulo. Incluye quejas, revocación de categoría, stock y entrega recurrente en lote. Los callbacks del worker se simulan por HTTP; no valida RabbitMQ ni la interfaz de Claude Desktop. Los resultados y logs quedan en `tmp/revision-entrega5/integracion-mcp`.
+Cada respuesta incluye texto legible y `structuredContent` con status, traceId y resultado completos. Los errores conservan `isError=true`; no se presentan escrituras fallidas como éxitos. Ante un timeout de escritura, consultar antes de reintentar: MCP no promete idempotencia de comandos que el backend no garantiza.
 
-La compatibilidad del servidor se verifica por protocolo stdio. La conexión en Claude Desktop se considera comprobada cuando ese cliente muestra las herramientas y ejecuta una consulta correctamente.
+## Pedidos para la demo
 
-Configuración oficial del cliente: [servidores MCP locales en Claude Desktop](https://modelcontextprotocol.io/docs/develop/connect-local-servers).
+1. «Mostrame las necesidades urgentes sin cubrir y el stock de cada producto por depósito.»
+2. «Prepará una donación de 10 unidades del producto P del donador D al depósito Z. Confirmemos los datos antes de enviarla.»
+3. «Consultá las asignaciones y explicame cuál corresponde a esa donación. Todavía no la marques entregada.»
+4. «Reportá la entrega del paquete y después mostrame la ficha integral del donador.»
+5. «Mostrame la calidad por categoría y los donadores con más quejas.»
+6. «Mostrame ocupación, algoritmo y tiempo medio de entrega del depósito entre estas fechas.»
 
-No se exponen endpoints de limpieza administrativa. Las herramientas que modifican datos realizan llamadas reales a las URLs configuradas.
+Los reportes tienen consistencia eventual: después de un comando puede haber una demora. Repetir una lectura no implica repetir la escritura.
 
-Referencia: https://java.sdk.modelcontextprotocol.io/v0.18.4/server/
+## Catálogo compartido
 
-Los eventos del gateway también pueden enviarse a Better Stack con `BETTERSTACK_SOURCE_TOKEN`, `BETTERSTACK_INGEST_URL` y `APP_NAME=donatrack-mcp` en el entorno del proceso Java (o `env` de la entrada MCP en Claude). El appender es opcional y no cambia el transporte: consola y diagnósticos de Logback usan stderr, stdout queda exclusivamente para JSON-RPC. Se registran herramienta, destino, estado y traceId, sin cuerpos ni credenciales.
+`scripts/generar_catalogo.py` mantiene `tools.json` de MCP, Telegram y `testing/contratos`. Desde TPA, regenerar también Postman con `python testing/entrega6/generar_postman.py`. El catálogo es el contrato de transporte compartido; no sustituye las validaciones de dominio.
+
+El ensayo completo está en `testing/entrega6/probar_demo.py --mcp`. Usa gateway, RabbitMQ y workers reales. La prueba stdio aislada valida protocolo y transporte con un HTTP stub; no demuestra conexión con Claude Desktop.

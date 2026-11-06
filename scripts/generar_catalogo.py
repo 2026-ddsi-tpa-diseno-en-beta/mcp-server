@@ -53,6 +53,26 @@ tool('insignias_donador','incentivos','GET','/insignias/donador/{id}','Consultar
 for component in ['donaciones','donadores','logistica','incentivos']:
     tool('salud_'+component,component,'GET','/actuator/health','Consultar disponibilidad del componente '+component)
     tool('metricas_'+component,component,'GET','/actuator/metrics','Consultar nombres de métricas disponibles en '+component)
+tool('ficha_integral_donador','consultas','GET','/donadores/{id}/ficha','Ficha combinada desde MongoDB: categoría e historial, insignias, misión y progreso, donaciones por estado, quejas y entidades beneficiadas. Consistencia eventual: si acabás de operar, consultá de nuevo sin repetir el comando de escritura.')
+tool('necesidades_urgentes','consultas','GET','/necesidades/urgentes','Necesidades sin cubrir ordenadas por urgencia, con stock disponible por depósito y unidades reservadas sin entregar.')
+catalog[-1]['schema']=obj({'filtros':obj(dict(urgenciaMinima=N,tipo=E('RECURRENTE','EXTRAORDINARIA'),categoriaID=S,subcategoriaID=S,limite=N),[])},[])
+tool('reporte_depositos','consultas','GET','/depositos/reporte','Ocupación, algoritmo, asignaciones por estado, entidades atendidas y tiempo medio desde ingreso hasta última entrega. El rango filtra fecha de ingreso. Fechas ISO yyyy-MM-dd o fecha-hora.')
+catalog[-1]['schema']=obj({'filtros':obj(dict(depositoID=S,desde=S,hasta=S),[])},[])
+tool('calidad_donaciones','consultas','GET','/calidad','Calidad por categoría y subcategoría (donaciones CONQUEJA / total de donaciones) y donadores con más quejas, estado y categoría.')
+catalog[-1]['schema']=obj({'filtros':obj(dict(limiteDonadores=N),[])},[])
+tool('estado_sistema','consultas','GET','/estado','Estado del modelo de lectura, cantidad de fichas, necesidades, depósitos y eventos procesados. No confundir consistencia eventual con falla de una operación.')
+tool('salud_consultas','consultas','GET','/actuator/health','Comprobar salud de Consultas y conexión a MongoDB.')
+tool('salud_gateway','gateway','GET','/actuator/health','Comprobar disponibilidad del punto de entrada único.')
+tool('subcategorias_de_categoria','donaciones','GET','/categorias/{id}/subcategorias','Listar las subcategorías de una categoría antes de clasificar un producto.')
+tool('donaciones_de_donador','donaciones','GET','/donaciones','Consultar donaciones de un donador desde una fecha ISO yyyy-MM-dd.')
+catalog[-1]['schema']=obj({'filtros':obj(dict(donadorID=S,fecha=S))})
+tool('asignar_stock_a_necesidad','logistica','POST','/stock/asignaciones','Reservar stock disponible para una necesidad existente. La reserva no significa entrega.',dict(necesidadId=S,productoId=S,cantidad=N))
+for operation in catalog:
+    readonly=operation['method']=='GET'
+    operation['annotations']=dict(readOnlyHint=readonly,destructiveHint=operation['method']=='DELETE',idempotentHint=readonly,openWorldHint=True)
+    if not readonly:
+        operation['description']+=' Confirmá con el usuario los datos y referencias antes de modificar. Ante timeout verificá el estado antes de reintentar.'
+
 targets = ['mcp-server/src/main/resources/tools.json']
 if Path('telegramBot').is_dir():
     targets.append('telegramBot/untitled/src/main/resources/tools.json')

@@ -63,6 +63,50 @@ class ApiGatewayTest {
   }
 
   @Test
+  void categoryParentBelongsOnlyToTheCreationContract() throws Exception {
+    assertTrue(
+        tool("crear_categoria")
+            .path("schema").path("properties").path("datos")
+            .path("properties").has("categoriaPadreID"));
+    assertFalse(
+        tool("modificar_categoria")
+            .path("schema").path("properties").path("datos")
+            .path("properties").has("categoriaPadreID"));
+
+    var gateway = new ApiGateway(Map.of("donaciones", "http://localhost:1"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> gateway.execute(
+            tool("modificar_categoria"),
+            Map.of("id", "categoria", "datos", Map.of(
+                "nombre", "Nombre", "descripcion", "Descripción", "categoriaPadreID", "otro"))));
+
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    AtomicReference<String> body = new AtomicReference<>(), method = new AtomicReference<>();
+    server.createContext("/categorias/categoria", exchange -> {
+      method.set(exchange.getRequestMethod());
+      body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+      byte[] output = "{\"id\":\"categoria\",\"categoriaPadreID\":\"original\"}"
+          .getBytes(StandardCharsets.UTF_8);
+      exchange.sendResponseHeaders(200, output.length);
+      exchange.getResponseBody().write(output);
+      exchange.close();
+    });
+    server.start();
+    try {
+      var updated = Map.of("nombre", "Nuevo nombre", "descripcion", "Nueva descripción");
+      var response = mapper.readTree(
+          new ApiGateway(Map.of("donaciones", "http://127.0.0.1:" + server.getAddress().getPort()))
+              .execute(tool("modificar_categoria"), Map.of("id", "categoria", "datos", updated)));
+      assertEquals("PUT", method.get());
+      assertEquals(mapper.valueToTree(updated), mapper.readTree(body.get()));
+      assertEquals("original", response.path("resultado").path("categoriaPadreID").asText());
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
   void sendsOriginalBodyAndTraceToTheCorrectComponent() throws Exception {
     HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     AtomicReference<String> body = new AtomicReference<>(), trace = new AtomicReference<>();

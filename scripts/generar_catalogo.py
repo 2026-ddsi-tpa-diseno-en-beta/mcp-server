@@ -13,15 +13,15 @@ def tool(name,component,method,path,description,fields=None,required=None):
     if '{id}' in path: args['id']={**S,'description':'Identificador existente obtenido en una consulta o alta'}
     if fields is not None: args['datos']=obj(fields,required)
     catalog.append(dict(name=name,component=component,method=method,path=path,description=description,schema=obj(args)))
-def crud(component,plural,singular,path,fields,required=None):
+def crud(component,plural,singular,path,fields,required=None,update_fields=None):
     tool('listar_'+plural,component,'GET',path,'Consultar todos los '+plural)
     tool('buscar_'+singular,component,'GET',path+'/{id}','Consultar '+singular+' por ID')
     tool('crear_'+singular,component,'POST',path,'Dar de alta '+singular+'. Devuelve el ID generado por DonaTrack.',fields,required)
-    tool('modificar_'+singular,component,'PUT',path+'/{id}','Modificar '+singular+' existente respetando las reglas y referencias del componente.',fields,required)
+    tool('modificar_'+singular,component,'PUT',path+'/{id}','Modificar '+singular+' existente respetando las reglas y referencias del componente.',fields if update_fields is None else update_fields,required)
     tool('eliminar_'+singular,component,'DELETE',path+'/{id}','Dar de baja '+singular+' existente. Puede rechazarse si está en uso.')
 
 crud('donaciones','productos','producto','/productos',dict(nombre=S,descripcion=S,categoriaID=S,subcategoriaID=S,identificadorID=S),['nombre','descripcion','categoriaID'])
-crud('donaciones','categorias','categoria','/categorias',dict(nombre=S,descripcion=S,categoriaPadreID=S),['nombre','descripcion'])
+crud('donaciones','categorias','categoria','/categorias',dict(nombre=S,descripcion=S,categoriaPadreID=S),['nombre','descripcion'],update_fields=dict(nombre=S,descripcion=S))
 crud('donaciones','identificadores','identificador','/identificadores',dict(tipo=E('CODIGODEBARRAS','QR'),descripcion=S))
 crud('donadores','donadores','donador','/donadores',dict(nombre=S,apellido=S,edad=N,email=S,nroDocumento=S,domicilio=S))
 crud('donadores','entidades','entidad','/entidades',dict(razonSocial=S,domicilio=S,telefono=S,correo=S))
